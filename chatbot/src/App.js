@@ -1,11 +1,9 @@
 import React, { Component } from 'react';
 import PropTypes from 'prop-types';
-import logo from './logo.svg';
 import './App.css';
 import ChatBot from 'react-simple-chatbot';
-
-
 import SpotifyWebApi from 'spotify-web-api-js';
+
 const spotifyApi = new SpotifyWebApi();
 
 class SearchTracks extends Component{
@@ -30,7 +28,7 @@ class SearchTracks extends Component{
   console.log(workingvalue);
 
   this.setState({ query:{name:workingvalue} });
-}
+  }
 
   getHashParams() {
     var hashParams = {};
@@ -169,15 +167,20 @@ class App extends Component {
               {
                 id: '4',
                 user: true,
-                validator: (value) => {
-                  if (value==="yes") {
-                    return true;
+                trigger : (input) =>{
+                  if((input.value).toLowerCase()==="yes"){
+                    return "5";
+                  } else if((input.value).toLowerCase()==="no"){
+                    return "12";
+                  } else{
+                    return "erroneous_input";
                   }
-                  else{
-                    return 'value should be yes';
-                  }
-                },
-                trigger: '5',
+                }
+              },
+              {
+                id: 'erroneous_input',
+                message : "Oops wrong input, yes or no",
+                trigger : '4'
               },
               {
                 id: '5',
@@ -230,6 +233,5 @@ class App extends Component {
   }
 }
 
-
-
 export default App;
+
