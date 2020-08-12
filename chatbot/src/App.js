@@ -5,12 +5,222 @@ import ChatBot from 'react-simple-chatbot';
 import SpotifyWebApi from 'spotify-web-api-js';
 
 const spotifyApi = new SpotifyWebApi();
+var express = require('express'); // Express web server framework
+var request = require('request'); // "Request" library
+//var cors = require('cors');
+var querystring = require('querystring');
+//var cookieParser = require('cookie-parser');
 
+var client_id ='c93bb77526894497a4a68360d72f2503' //Your client id
+var client_secret = '7c212fd5a8304b299f4d8aff0cd7bba5' //your secret
+var redirect_uri = 'http://localhost:8888/callback'//your redirect uri
+/** 
+// Authorizes and obtains the access tokens and refresh tokens for the API
+function setUpSpotify(){
+  var client_id ='c93bb77526894497a4a68360d72f2503' //the client id
+  // var client_secret = '7c212fd5a8304b299f4d8aff0cd7bba5' //your secret
+  var redirect_uri = 'http://localhost:8888/callback'  //the redirect uri
+  var access_token = null;
+  var refresh_token = null;
+  var params = null;
+ 
+  //requesting authorization
+  var app = express();
+  var req = require('request');
+ 
+
+ 
+  app.get('/login', function(req, res) {
+    var scope = 'user-read-private user-read-email';  // set the scopes
+    res.redirect('https://accounts.spotify.com/authorize?' +
+      querystring.stringify({
+        client_id: client_id,
+        response_type: 'code',
+        scope: encodeURIComponent(scope),
+        redirect_uri: encodeURIComponent(redirect_uri)
+      })
+    );
+  });
+  
+
+    //requests refresh and access tokens
+  var code = req.query.code || null;
+  var authOptions = {
+    url: 'https://accounts.spotify.com/api/token',
+    form: {
+      code: code,
+      redirect_uri: redirect_uri,
+      grant_type: 'authorization_code'
+    },
+    
+    headers: {
+      'Authorization': 'Basic ' + (new Buffer(client_id + ':' + client_secret).toString('base64'))
+    },
+    json: true
+  };
+
+  request.post(authOptions, function(error, response, body) {
+    if (!error && response.statusCode === 200) {
+
+      var access_token = body.access_token,
+          refresh_token = body.refresh_token;
+
+      var options = {
+        url: 'https://api.spotify.com/v1/me',
+        headers: { 'Authorization': 'Bearer ' + access_token },
+        json: true
+      };
+    }
+  });
+  return params = {access_token:access_token , refresh_token:refresh_token}
+}
+  */
+ function setUpSpotify(){
+
+var params = {}
+var access_token = '';
+var refresh_token = '';
+var express = require('express'); // Express web server framework
+var request = require('request'); // "Request" library
+var cors = require('cors');
+var querystring = require('querystring');
+var cookieParser = require('cookie-parser');
+
+var client_id = 'c93bb77526894497a4a68360d72f2503'; // Your client id
+var client_secret = '7c212fd5a8304b299f4d8aff0cd7bba5'; // Your secret
+var redirect_uri = 'http://localhost:8888/callback/'; // Your redirect uri
+
+var generateRandomString = function(length) {
+  var text = '';
+  var possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+
+  for (var i = 0; i < length; i++) {
+    text += possible.charAt(Math.floor(Math.random() * possible.length));
+  }
+  return text;
+};
+
+var stateKey = 'spotify_auth_state';
+
+var app = express();
+
+app.use(express.static(__dirname + '/public'))
+   .use(cors())
+   .use(cookieParser());
+
+app.get('/login', function(req, res) {
+
+  var state = generateRandomString(16);
+  res.cookie(stateKey, state);
+
+  // your application requests authorization
+  var scope = 'user-read-private user-read-email'; // 
+  res.redirect('https://accounts.spotify.com/authorize?' +
+    querystring.stringify({
+      response_type: 'code',
+      redirect_uri: redirect_uri,
+      client_id: client_id,
+      scope: scope,
+      state: state
+    }));
+});
+
+app.get('/callback', function(req, res) {
+
+  // your application requests refresh and access tokens
+  // after checking the state parameter
+
+  var code = req.query.code || null;
+  var state = req.query.state || null;
+  var storedState = req.cookies ? req.cookies[stateKey] : null;
+
+  if (state === null || state !== storedState) {
+    res.redirect('/#' +
+      querystring.stringify({
+        error: 'state_mismatch'
+      }));
+  } else {
+    res.clearCookie(stateKey);
+    var authOptions = {
+      url: 'https://accounts.spotify.com/api/token',
+      form: {
+        code: code,
+        redirect_uri: redirect_uri,
+        grant_type: 'authorization_code'
+      },
+      headers: {
+        'Authorization': 'Basic ' + (new Buffer(client_id + ':' + client_secret).toString('base64'))
+      },
+      json: true
+    };
+
+    request.post(authOptions, function(error, response, body) {
+      if (!error && response.statusCode === 200) {
+
+        var access_token = body.access_token,
+            refresh_token = body.refresh_token;
+
+        var options = {
+          url: 'https://api.spotify.com/v1/me',
+          headers: { 'Authorization': 'Bearer ' + access_token },
+          json: true
+        };
+
+        // use the access token to access the Spotify Web API
+        request.get(options, function(error, response, body) {
+          console.log(body);
+        });
+
+        // we can also pass the token to the browser to make requests from there
+        res.redirect('/#' +
+          querystring.stringify({
+            access_token: access_token,
+            refresh_token: refresh_token
+          }));
+      } else {
+        res.redirect('/#' +
+          querystring.stringify({
+            error: 'invalid_token'
+          }));
+      }
+    });
+  }
+  return params = {access_token:access_token , refresh_token:refresh_token}
+});
+
+app.get('/refresh_token', function(req, res) {
+
+  // requesting access token from refresh token
+  var refresh_token = req.query.refresh_token;
+  var authOptions = {
+    url: 'https://accounts.spotify.com/api/token',
+    headers: { 'Authorization': 'Basic ' + (new Buffer(client_id + ':' + client_secret).toString('base64')) },
+    form: {
+      grant_type: 'refresh_token',
+      refresh_token: refresh_token
+    },
+    json: true
+  };
+
+  request.post(authOptions, function(error, response, body) {
+    if (!error && response.statusCode === 200) {
+      var access_token = body.access_token;
+      res.send({
+        'access_token': access_token
+      });
+    }
+  });
+});
+
+console.log('Listening on 8888');
+app.listen(8888);
+
+ }
 class SearchTracks extends Component{
   constructor(){
     super();
-    const params = this.getHashParams();
-    const token = params.access_token;
+    var params = this.setUpSpotify();
+    var token = params.access_token;
     if (token) {
       spotifyApi.setAccessToken(token);
     }
@@ -143,6 +353,7 @@ class NowPlaying extends Component{
 }
 
 class App extends Component {
+  
   render() {
     return (
         <ChatBot
@@ -150,81 +361,94 @@ class App extends Component {
             recognitionEnable={true}
             steps={[
               {
-                id: '1',
-                message: 'Hi!What is your name?',
-                trigger: '2',
+                id: 'Input_name?',
+                message: 'Hi! What is your name?',
+                trigger: 'Name_input',
               },
               {
-                id: '2',
+                id: 'Name_input',
                 user: true,
-                trigger: '3',
+                trigger: 'Playing_now?',
               },
               {
-                id: '3',
+                id: 'Playing_now?',
                 message: 'Hi {previousValue}!,Do you want to know what track is playing?',
-                trigger: '4',
+                trigger: 'Playingchoice_input',
               },
               {
-                id: '4',
+                id: 'Playingchoice_input',
                 user: true,
                 trigger : (input) =>{
-                  if((input.value).toLowerCase()==="yes"){
-                    return "5";
-                  } else if((input.value).toLowerCase()==="no"){
-                    return "12";
+                  if((input.value).toLowerCase()==="yes" |(input.value).toLowerCase()==="yap" | (input.value).toLowerCase()==="yeah" ){
+                    return "Now_playing";
+                  } else if((input.value).toLowerCase()==='no'| (input.value).toLowerCase()==="naah" ){
+                    return "Track_search?";
                   } else{
-                    return "erroneous_input";
+                    return "Input_error";
                   }
                 }
               },
               {
-                id: 'erroneous_input',
-                message : "Oops wrong input, yes or no",
-                trigger : '4'
+                id: 'Input_error',
+                message : "Oops! wrong input, Please select yes/no",
+                trigger : 'Playing'
               },
               {
-                id: '5',
+                id: 'Now_playing',
                 component: <NowPlaying />,
-                trigger: '6',
+                trigger: 'Track_search?',
               },
               {
-                id: '6',
-                message: 'Hi {previousValue}!,Do you want to know what track is playing?',
-                trigger: '7',
+                id: 'Track_search?',
+                message: 'Do you want to search for a specific track instead?',
+                trigger: 'Track_search',
               },
               {
-                id: '7',
+                id: 'Playing',
                 options: [
-                    { value: 'yes', label: 'yes', trigger: '5' },
-                    { value: 'no', label: 'no', trigger: 'tracksearch' },
+                    { value: 'yes', label: 'yes', trigger: 'Now_playing' },
+                    { value: 'no', label: 'no', trigger: 'Track_search?' },
                   ],
               },
               {
-                id: 'tracksearch',
+                id: 'Track_search',
                 options: [
-                    { value: 'yes', label: 'Yes', trigger: '9' },
-                    { value: 'no', label: 'No', trigger: '12' },
+                    { value: 'yes', label: 'Yes', trigger: 'Track_input?' },
+                    { value: 'Another day maybe', label: 'No', trigger: 'End_statement' },
                   ],
               },
               {
-                id: '9',
-                message: 'Let me know what track you want to find?',
-                trigger:10,
+                id: 'Track_input?',
+                message: 'Let me know what track you want to find ...',
+                trigger:"Track_input",
               },
               {
-                id: '10',
+                id: 'Track_input',
                 user: true,
-                trigger:11,
+                trigger:"Search_track",
               },
               {
-                id: '11',
+                id: 'Search_track',
                 component: <SearchTracks />,
-                waitAction: true,
-                trigger:12,
+                //waitAction: true,
+                trigger:'Problems',
               },
               {
-                id: '12',
-                message: 'Thanks for asking',
+                id: 'Problems',
+                message: 'You need to connect to spotify to continue using Chatify.',
+                trigger: 'Options',
+              },
+              { 
+                id: 'Options',
+                options: [
+                    { value: 'What\'s playing now?', label: 'Now playing', trigger: 'Now_playing' },
+                    { value: 'I\'d like to search for a song!', label: 'Song search', trigger: 'Track_input?'},
+                    { value: 'Thanks, that\'ll be it for now.', label: 'Quit', trigger: 'End_statement'},
+                  ],
+              },
+              {
+                id: 'End_statement',
+                message: 'Thanks for using Chatify!',
                 end: true,
               },
             ]}
@@ -234,4 +458,3 @@ class App extends Component {
 }
 
 export default App;
-
